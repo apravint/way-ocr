@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# way-ocr - Lightning-Fast Screen OCR & Text Extractor for Wayland
+# https://github.com/apravint/way-ocr
+# ==============================================================================
+set -euo pipefail
+
+VERSION="1.0.0"
+LANG_OPT="eng"
+NOTIFY=true
+CLEANUP=true
+
+show_help() {
+    cat << HELP_EOF
+way-ocr v$VERSION - Instant Screen Text Extractor for Wayland
+
+Usage:
+  way-ocr [options]
+
+Options:
+  -l, --lang <lang>     Tesseract OCR language (default: eng)
+  -q, --quiet           Suppress desktop notifications
+  -v, --version         Print version and exit
+  -h, --help            Show this help overview
+
+Dependencies:
+  slurp, grim, tesseract, wl-copy, notify-send (optional)
+
+Examples:
+  way-ocr               # Drag selection and copy text to clipboard
+  way-ocr -l fra        # Extract French text
+HELP_EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -l|--lang)
+            LANG_OPT="$2"
+            shift 2
+            ;;
+        -q|--quiet)
+            NOTIFY=false
+            shift
+            ;;
+        -v|--version)
+            echo "way-ocr v$VERSION"
+            exit 0
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+# Dependency check
+for cmd in slurp grim tesseract wl-copy; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        if [ "$NOTIFY" = true ] && command -v notify-send >/dev/null 2>&1; then
+            notify-send -u critical -a "way-ocr" "Missing Dependency" "Please install '$cmd' to use way-ocr."
+        fi
+        echo "Error: required dependency '$cmd' is not installed." >&2
+        exit 1
+    fi
+done
+
+TEMP_IMG=$(mktemp /tmp/way-ocr-XXXXXX.png)
+TEMP_TXT=$(mktemp /tmp/way-ocr-XXXXXX)
+
+cleanup() {
+    rm -f "$TEMP_IMG" "${TEMP_TXT}"* 2>/dev/null || true
+}
+trap cleanup EXIT
+
+# 1. Drag selection
+GEOM=$(slurp 2>/dev/null || true)
+if [ -z "$GEOM" ]; then
+    # User cancelled selection (ESC or click outside)
+    exit 0
+fi
+
+# 2. Capture area
+grim -g "$GEOM" "$TEMP_IMG" 2>/dev/null || exit 1
+
+# 3. Perform OCR
+if tesseract "$TEMP_IMG" "$TEMP_TXT" --oem 1 -l "$LANG_OPT" 2>/dev/null; then
+    if [ -f "${TEMP_TXT}.txt" ]; then
+        EXTRACTED=$(sed '/^[[:space:]]*$/d' "${TEMP_TXT}.txt")
+        if [ -n "$EXTRACTED" ]; then
+            printf "%s" "$EXTRACTED" | wl-copy
+            if [ "$NOTIFY" = true ] && command -v notify-send >/dev/null 2>&1; then
+                PREVIEW=$(echo "$EXTRACTED" | head -n 3 | cut -c 1-80)
+                notify-send -a "way-ocr" "Text Copied to Clipboard" "$PREVIEW" -i edit-paste -t 4000
+            fi
+            echo "$EXTRACTED"
+            exit 0
+        fi
+    fi
+fi
+
+if [ "$NOTIFY" = true ] && command -v notify-send >/dev/null 2>&1; then
+    notify-send -a "way-ocr" "OCR Complete" "No readable text detected in selection." -i dialog-information -t 3000
+fi
