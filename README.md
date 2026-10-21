@@ -63,6 +63,47 @@ bindsym $mod+Ctrl+Print exec way-ocr
 riverctl map normal Super+Control Print spawn way-ocr
 ```
 
+## Availability via app menu
+
+To make it available in your menu (like wofi) you can create a `.desktop` file in `~/.local/share/applications` with the following content.
+
+```
+[Desktop Entry]
+Name=Way OCR
+Comment=Screen OCR and text extractor for Wayland
+Exec=~/.local/bin/way-ocr
+Type=Application
+Categories=Utility;
+```
+
+### Other languages
+
+The example above will only recognize the default language (English). If you need other languages, you can add them via desktop actions.
+
+```
+[Desktop Entry]
+Name=Way OCR
+Comment=Screen OCR and text extractor for Wayland
+Exec=~/.local/bin/way-ocr
+Type=Application
+Categories=Utility;
+Actions=jp;fr
+
+[Desktop Action jp]
+Name=Way OCR jp
+Exec=~/.local/bin/way-ocr -l jpn
+
+[Desktop Action fr]
+Name=Way OCR fr
+Exec=~/.local/bin/way-ocr -l fra
+```
+
+Note, that you need to install related tesseract language dependencies. For this example on Arch Linux you need to run
+
+```sh
+# pacman -S tesseract-data-jpn tesseract-data-fra
+```
+
 ---
 
 ## 📄 License
