@@ -8,7 +8,6 @@ set -euo pipefail
 VERSION="1.0.0"
 LANG_OPT="eng"
 NOTIFY=true
-CLEANUP=true
 
 show_help() {
     cat << HELP_EOF
